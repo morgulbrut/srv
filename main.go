@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/joshuarli/srv/internal/humanize"
+	"github.com/morgulbrut/srv/internal/humanize"
 )
 
 type context struct {
