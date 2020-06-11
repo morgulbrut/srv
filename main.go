@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/morgulbrut/color256"
 	"github.com/morgulbrut/srv/internal/humanize"
 )
 
@@ -23,7 +24,10 @@ type context struct {
 
 // We write the shortest browser-valid base64 data string,
 // so that the browser does not request the favicon.
-const listingPrelude = `<head><link rel=icon href=data:,><style>* { font-family: monospace; } table { border: none; margin: 1rem; } td { padding-right: 2rem; }</style></head>
+const listingPrelude = `<head>
+<link rel=icon href=data:,>
+<style>* { font-family: monospace; } table { border: none; margin: 1rem; } td { padding-right: 2rem; }</style>
+</head>
 <table>`
 
 func renderListing(w http.ResponseWriter, r *http.Request, f *os.File) error {
@@ -68,7 +72,7 @@ func renderListing(w http.ResponseWriter, r *http.Request, f *os.File) error {
 
 func (c *context) handler(w http.ResponseWriter, r *http.Request) {
 	// TODO: better log styling
-	log.Printf("\t%s [%s]: %s %s %s", r.RemoteAddr, r.UserAgent(), r.Method, r.Proto, r.Host+r.RequestURI)
+	log.Printf(color256.HiYellow("--> %s %s %s %s", r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent()))
 
 	// Tell HTTP 1.1+ clients to not cache responses.
 	w.Header().Set("Cache-Control", "no-store")
@@ -128,15 +132,9 @@ func (c *context) handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func die(format string, v ...interface{}) {
-	fmt.Fprintf(os.Stderr, format, v...)
-	os.Stderr.Write([]byte("\n"))
-	os.Exit(1)
-}
-
 func main() {
 	flag.Usage = func() {
-		die(`srv %s (go version %s)
+		fmt.Println(`srv (go version %s)
 
 usage: %s [-q] [-p port] [-c certfile -k keyfile] directory
 
@@ -147,7 +145,7 @@ directory       path to directory to serve (default: .)
 -b address      listener socket's bind address (default: 127.0.0.1)
 -c certfile     optional path to a PEM-format X.509 certificate
 -k keyfile      optional path to a PEM-format X.509 key
-`, VERSION, runtime.Version(), os.Args[0])
+`, runtime.Version(), os.Args[0])
 	}
 
 	var quiet bool
@@ -162,13 +160,13 @@ directory       path to directory to serve (default: .)
 	certFileSpecified := certFile != ""
 	keyFileSpecified := keyFile != ""
 	if certFileSpecified != keyFileSpecified {
-		die("You must specify both -c certfile -k keyfile.")
+		log.Fatal(color256.HiRed("You must specify both -c certfile -k keyfile."))
 	}
 
 	listenAddr := net.JoinHostPort(bindAddr, port)
 	_, err := net.ResolveTCPAddr("tcp", listenAddr)
 	if err != nil {
-		die("Could not resolve the address to listen to: %s", listenAddr)
+		log.Fatal(color256.HiRed("Could not resolve the address to listen to: %s", listenAddr))
 	}
 
 	srvDir := "."
@@ -178,11 +176,11 @@ directory       path to directory to serve (default: .)
 	}
 	f, err := os.Open(srvDir)
 	if err != nil {
-		die(err.Error())
+		log.Fatal(color256.HiRed(err.Error()))
 	}
 	defer f.Close()
 	if fi, err := f.Stat(); err != nil || !fi.IsDir() {
-		die("%s isn't a directory.", srvDir)
+		log.Fatal(color256.HiRed("%s isn't a directory.", srvDir))
 	}
 
 	c := &context{
@@ -197,12 +195,12 @@ directory       path to directory to serve (default: .)
 	http.HandleFunc("/", c.handler)
 
 	if certFileSpecified && keyFileSpecified {
-		log.Printf("\tServing %s over HTTPS on %s", srvDir, listenAddr)
+		log.Printf(color256.HiOrange("\tServing %s over HTTPS on %s", srvDir, listenAddr))
 		err = http.ListenAndServeTLS(listenAddr, certFile, keyFile, nil)
 	} else {
-		log.Printf("\tServing %s over HTTP on %s", srvDir, listenAddr)
+		log.Printf(color256.HiOrange("\tServing %s over HTTP on %s", srvDir, listenAddr))
 		err = http.ListenAndServe(listenAddr, nil)
 	}
 
-	die(err.Error())
+	log.Fatal(color256.HiRed(err.Error()))
 }
